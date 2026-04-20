@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <BH1750.h>
+#include <DHT.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include "secrets.h"
@@ -10,10 +11,14 @@
 #define I2C_SDA 17
 #define I2C_SCL 18
 
+// ─── DHT22 ─────────────────────────────────────────────────────────────────────────────
+#define DHT_PIN   4
+#define DHT_TYPE  DHT22
+
 // ─── Tópicos MQTT ───────────────────────────────────────────────────────────────────
-#define TOPIC_SENSOR   "esp32/bh1750/lux"          // publica leituras JSON
-#define TOPIC_STATUS   "esp32/bh1750/status"        // online / offline (retained)
-#define TOPIC_INTERVAL "esp32/bh1750/set/interval"  // recebe novo intervalo em ms
+#define TOPIC_TELEMETRY "esp32/sensors/telemetry"   // publica todas as leituras em um único JSON
+#define TOPIC_STATUS    "esp32/sensors/status"      // online / offline (retained)
+#define TOPIC_INTERVAL  "esp32/sensors/set/interval" // recebe novo intervalo em ms
 
 // ─── Intervalo de report ──────────────────────────────────────────────────────────────────
 #define INTERVAL_DEFAULT_MS  2000
@@ -22,11 +27,13 @@
 
 // ─── Globais ───────────────────────────────────────────────────────────────────────────
 BH1750       lightMeter;
+DHT          dht(DHT_PIN, DHT_TYPE);
 WiFiClient   wifiClient;
 PubSubClient mqtt(wifiClient);
 
 static uint32_t reportIntervalMs = INTERVAL_DEFAULT_MS;
 static bool     bh1750Ok         = false;
+static bool     dhtOk            = false;
 
 // ─── Helpers de log ──────────────────────────────────────────────────────────────────
 static void logInfo (const char* tag, const String& msg) { Serial.printf("[INFO ] [%s] %s\n", tag, msg.c_str()); }
@@ -120,6 +127,21 @@ static void i2cScan() {
     logInfo("I2C", "Scan concluído — " + String(found) + " dispositivo(s)");
 }
 
+// ─── DHT22 ───────────────────────────────────────────────────────────────────────────
+static bool initDHT() {
+    dht.begin();
+    delay(2000); // DHT22 precisa de ~2s para a primeira leitura estável
+    float t = dht.readTemperature();
+    float h = dht.readHumidity();
+    if (isnan(t) || isnan(h)) {
+        logError("DHT22", "Sensor não respondeu na inicialização (pino " + String(DHT_PIN) + ").");
+        return false;
+    }
+    logInfo("DHT22", "Iniciado no pino " + String(DHT_PIN) +
+        " — T=" + String(t, 1) + "°C  H=" + String(h, 1) + "%");
+    return true;
+}
+
 // ─── BH1750 ──────────────────────────────────────────────────────────────────────────
 static bool initBH1750() {
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -161,6 +183,10 @@ void setup() {
     bh1750Ok = initBH1750();
     if (!bh1750Ok) logWarn("SETUP", "Sistema iniciado SEM sensor BH1750.");
 
+    logInfo("SETUP", "Iniciando DHT22 no pino " + String(DHT_PIN) + "...");
+    dhtOk = initDHT();
+    if (!dhtOk) logWarn("SETUP", "Sistema iniciado SEM sensor DHT22.");
+
     logInfo("SETUP", "Intervalo de report: " + String(reportIntervalMs) + " ms");
     logInfo("SETUP", "Inicialização concluída.");
 }
@@ -173,21 +199,54 @@ void loop() {
     if (millis() - lastRead < reportIntervalMs) return;
     lastRead = millis();
 
-    if (!bh1750Ok) { logWarn("BH1750", "Sensor não disponível."); return; }
+    // ─── BH1750 ─────────────────────────────────────────────────────────────────
+    float lux = NAN;
+    if (bh1750Ok) {
+        lux = lightMeter.readLightLevel();
+        if (lux < 0) {
+            logError("BH1750", "Falha na leitura.");
+            lux = NAN;
+        } else {
+            logInfo("BH1750", "Luminosidade: " + String(lux, 1) + " lx");
+        }
+    } else {
+        logWarn("BH1750", "Sensor não disponível.");
+    }
 
-    float lux = lightMeter.readLightLevel();
-    if (lux < 0) { logError("BH1750", "Falha na leitura."); return; }
+    // ─── DHT22 ──────────────────────────────────────────────────────────────────
+    float t = NAN, h = NAN, hic = NAN;
+    if (dhtOk) {
+        t = dht.readTemperature();
+        h = dht.readHumidity();
+        if (isnan(t) || isnan(h)) {
+            logError("DHT22", "Falha na leitura.");
+            t = h = hic = NAN;
+        } else {
+            hic = dht.computeHeatIndex(t, h, false);
+            logInfo("DHT22", "T=" + String(t, 1) + "°C  H=" + String(h, 1) +
+                "%  HI=" + String(hic, 1) + "°C");
+        }
+    } else {
+        logWarn("DHT22", "Sensor não disponível.");
+    }
 
-    logInfo("BH1750", "Luminosidade: " + String(lux, 1) + " lx");
-
-    char payload[64];
-    snprintf(payload, sizeof(payload),
-        "{\"lux\":%.1f,\"interval_ms\":%lu}", lux, reportIntervalMs);
+    // ─── Monta payload único ────────────────────────────────────────────────────
+    char payload[192];
+    int n = snprintf(payload, sizeof(payload), "{");
+    if (!isnan(lux)) n += snprintf(payload + n, sizeof(payload) - n, "\"lux\":%.1f,", lux);
+    else             n += snprintf(payload + n, sizeof(payload) - n, "\"lux\":null,");
+    if (!isnan(t))   n += snprintf(payload + n, sizeof(payload) - n, "\"temperature\":%.1f,", t);
+    else             n += snprintf(payload + n, sizeof(payload) - n, "\"temperature\":null,");
+    if (!isnan(h))   n += snprintf(payload + n, sizeof(payload) - n, "\"humidity\":%.1f,", h);
+    else             n += snprintf(payload + n, sizeof(payload) - n, "\"humidity\":null,");
+    if (!isnan(hic)) n += snprintf(payload + n, sizeof(payload) - n, "\"heat_index\":%.1f,", hic);
+    else             n += snprintf(payload + n, sizeof(payload) - n, "\"heat_index\":null,");
+    snprintf(payload + n, sizeof(payload) - n, "\"interval_ms\":%lu}", reportIntervalMs);
 
     if (mqtt.connected()) {
-        mqtt.publish(TOPIC_SENSOR, payload);
-        logInfo("MQTT", "Publicado: " + String(payload));
+        mqtt.publish(TOPIC_TELEMETRY, payload);
+        logInfo("MQTT", "Publicado [" TOPIC_TELEMETRY "]: " + String(payload));
     } else {
-        logWarn("MQTT", "Desconectado — leitura não publicada.");
+        logWarn("MQTT", "Desconectado — telemetria não publicada.");
     }
 }
