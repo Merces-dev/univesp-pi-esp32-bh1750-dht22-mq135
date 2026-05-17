@@ -15,6 +15,9 @@
 #define DHT_PIN   4
 #define DHT_TYPE  DHT22
 
+// ─── MQ-135 (qualidade do ar) ──────────────────────────────────────────────────────────
+#define MQ135_PIN 5          // pino ADC (GPIO5)
+
 // ─── Tópicos MQTT ───────────────────────────────────────────────────────────────────
 #define TOPIC_TELEMETRY "esp32/sensors/telemetry"   // publica todas as leituras em um único JSON
 #define TOPIC_STATUS    "esp32/sensors/status"      // online / offline (retained)
@@ -34,6 +37,7 @@ PubSubClient mqtt(wifiClient);
 static uint32_t reportIntervalMs = INTERVAL_DEFAULT_MS;
 static bool     bh1750Ok         = false;
 static bool     dhtOk            = false;
+static bool     mq135Ok          = false;
 
 // ─── Helpers de log ──────────────────────────────────────────────────────────────────
 static void logInfo (const char* tag, const String& msg) { Serial.printf("[INFO ] [%s] %s\n", tag, msg.c_str()); }
@@ -142,6 +146,18 @@ static bool initDHT() {
     return true;
 }
 
+// ─── MQ-135 ──────────────────────────────────────────────────────────────────────────
+static bool initMQ135() {
+    pinMode(MQ135_PIN, INPUT);
+    int raw = analogRead(MQ135_PIN);
+    if (raw < 0) {
+        logError("MQ135", "Falha na leitura do pino " + String(MQ135_PIN));
+        return false;
+    }
+    logInfo("MQ135", "Iniciado no pino " + String(MQ135_PIN) + " — raw=" + String(raw));
+    return true;
+}
+
 // ─── BH1750 ──────────────────────────────────────────────────────────────────────────
 static bool initBH1750() {
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -169,7 +185,7 @@ void setup() {
 
     Serial.println();
     Serial.println("╔══════════════════════════════════╗");
-    Serial.println("║  ESP32 · BH1750 · MQTT Logger   ║");
+    Serial.println("║  ESP32 · BH1750 · MQ135 Logger  ║");
     Serial.println("╚══════════════════════════════════╝");
     Serial.flush();
 
@@ -186,6 +202,10 @@ void setup() {
     logInfo("SETUP", "Iniciando DHT22 no pino " + String(DHT_PIN) + "...");
     dhtOk = initDHT();
     if (!dhtOk) logWarn("SETUP", "Sistema iniciado SEM sensor DHT22.");
+
+    logInfo("SETUP", "Iniciando MQ-135 no pino " + String(MQ135_PIN) + "...");
+    mq135Ok = initMQ135();
+    if (!mq135Ok) logWarn("SETUP", "Sistema iniciado SEM sensor MQ-135.");
 
     logInfo("SETUP", "Intervalo de report: " + String(reportIntervalMs) + " ms");
     logInfo("SETUP", "Inicialização concluída.");
@@ -230,8 +250,23 @@ void loop() {
         logWarn("DHT22", "Sensor não disponível.");
     }
 
+    // ─── MQ-135 ─────────────────────────────────────────────────────────────────
+    float airQuality = NAN;
+    if (mq135Ok) {
+        int raw = analogRead(MQ135_PIN);
+        if (raw >= 0) {
+            // Mapeia 0-4095 (12-bit ADC) para escala PPM aproximada 0-1000
+            airQuality = (raw / 4095.0f) * 1000.0f;
+            logInfo("MQ135", "Qualidade do ar: " + String(airQuality, 1) + " ppm (raw=" + String(raw) + ")");
+        } else {
+            logError("MQ135", "Falha na leitura.");
+        }
+    } else {
+        logWarn("MQ135", "Sensor não disponível.");
+    }
+
     // ─── Monta payload único ────────────────────────────────────────────────────
-    char payload[192];
+    char payload[256];
     int n = snprintf(payload, sizeof(payload), "{");
     if (!isnan(lux)) n += snprintf(payload + n, sizeof(payload) - n, "\"lux\":%.1f,", lux);
     else             n += snprintf(payload + n, sizeof(payload) - n, "\"lux\":null,");
@@ -241,6 +276,8 @@ void loop() {
     else             n += snprintf(payload + n, sizeof(payload) - n, "\"humidity\":null,");
     if (!isnan(hic)) n += snprintf(payload + n, sizeof(payload) - n, "\"heat_index\":%.1f,", hic);
     else             n += snprintf(payload + n, sizeof(payload) - n, "\"heat_index\":null,");
+    if (!isnan(airQuality)) n += snprintf(payload + n, sizeof(payload) - n, "\"air_quality\":%.1f,", airQuality);
+    else                    n += snprintf(payload + n, sizeof(payload) - n, "\"air_quality\":null,");
     snprintf(payload + n, sizeof(payload) - n, "\"interval_ms\":%lu}", reportIntervalMs);
 
     if (mqtt.connected()) {

@@ -1,0 +1,8 @@
+{
+  "name": "mock-device",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "mqtt": "^5.3.4"
+  }
+}

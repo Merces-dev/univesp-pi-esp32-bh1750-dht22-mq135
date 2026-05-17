@@ -6,13 +6,13 @@ services:
     restart: unless-stopped
     ports:
       - "1883:1883" # MQTT padrão
-      - "9001:9001" # WebSocket (para frontend)
+      - "9001:9001" # WebSocket (para debug)
     volumes:
       - ./mqtt/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mqtt_data:/mosquitto/data
       - mqtt_logs:/mosquitto/log
 
-  # ─── Backend (NestJS) ───────────────────────────────────────────────────────────────────
+  # ─── Backend (NestJS) ───────────────────────────────────────────────────────
   backend:
     build: ./backend
     container_name: backend
@@ -25,7 +25,7 @@ services:
     depends_on:
       - mqtt-broker
 
-  # ─── Frontend (Vite + React) ─────────────────────────────────────────────────────────────
+  # ─── Frontend (Vite + React) ────────────────────────────────────────────────
   frontend:
     build: ./frontend
     container_name: frontend
@@ -34,6 +34,18 @@ services:
       - "8080:80"
     depends_on:
       - backend
+
+  # ─── Mock ESP32 (simulador de telemetria) ───────────────────────────────────
+  mock-device:
+    build: ./mock
+    container_name: mock-device
+    restart: unless-stopped
+    environment:
+      - MQTT_BROKER=mqtt-broker
+      - MQTT_PORT=1883
+      - INTERVAL_MS=2000
+    depends_on:
+      - mqtt-broker
 
 volumes:
   mqtt_data:
