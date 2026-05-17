@@ -1,12 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import {
   RawTelemetry,
   ProcessedTelemetry,
   SensorStats,
   MetricStats,
-} from './interfaces/telemetry.interface';
+} from "./interfaces/telemetry.interface";
 
 const MAX_HISTORY = 200;
 const MOVING_AVG_WINDOW = 10;
@@ -25,14 +25,14 @@ const VALID_RANGES: Record<string, { min: number; max: number }> = {
 export class SensorsService {
   private readonly logger = new Logger(SensorsService.name);
   private history: ProcessedTelemetry[] = [];
-  private deviceStatus = 'offline';
+  private deviceStatus = "offline";
   private readonly startTime = Date.now();
 
   constructor(private readonly eventEmitter: EventEmitter2) {}
 
   /* ───────── Eventos ───────── */
 
-  @OnEvent('telemetry.raw')
+  @OnEvent("telemetry.raw")
   handleRawTelemetry(raw: RawTelemetry): void {
     const validated = this.validate(raw);
     if (!validated) return;
@@ -43,16 +43,16 @@ export class SensorsService {
       this.history = this.history.slice(-MAX_HISTORY);
     }
 
-    this.eventEmitter.emit('telemetry.processed', processed);
+    this.eventEmitter.emit("telemetry.processed", processed);
     this.logger.debug(
       `Processed: T=${processed.temperature}°C  H=${processed.humidity}%  L=${processed.lux}lx`,
     );
   }
 
-  @OnEvent('device.status')
+  @OnEvent("device.status")
   handleDeviceStatus(status: string): void {
     this.deviceStatus = status;
-    this.eventEmitter.emit('device.status.changed', status);
+    this.eventEmitter.emit("device.status.changed", status);
     this.logger.log(`Device status → ${status}`);
   }
 
@@ -63,7 +63,7 @@ export class SensorsService {
 
     for (const [key, range] of Object.entries(VALID_RANGES)) {
       const value = (validated as any)[key];
-      if (value !== null && typeof value === 'number') {
+      if (value !== null && typeof value === "number") {
         if (value < range.min || value > range.max) {
           this.logger.warn(
             `Out-of-range ${key}: ${value} (valid: ${range.min}–${range.max})`,
@@ -79,7 +79,7 @@ export class SensorsService {
       validated.humidity === null &&
       validated.air_quality === null
     ) {
-      this.logger.warn('All sensor values null — discarding reading');
+      this.logger.warn("All sensor values null — discarding reading");
       return null;
     }
 
@@ -89,10 +89,10 @@ export class SensorsService {
   /* ───────── Processamento ───────── */
 
   private process(raw: RawTelemetry): ProcessedTelemetry {
-    const recentTemps = this.recentValues('temperature', MOVING_AVG_WINDOW);
-    const recentHumids = this.recentValues('humidity', MOVING_AVG_WINDOW);
-    const recentLux = this.recentValues('lux', MOVING_AVG_WINDOW);
-    const recentAir = this.recentValues('airQuality', MOVING_AVG_WINDOW);
+    const recentTemps = this.recentValues("temperature", MOVING_AVG_WINDOW);
+    const recentHumids = this.recentValues("humidity", MOVING_AVG_WINDOW);
+    const recentLux = this.recentValues("lux", MOVING_AVG_WINDOW);
+    const recentAir = this.recentValues("airQuality", MOVING_AVG_WINDOW);
 
     return {
       lux: raw.lux,
@@ -109,10 +109,10 @@ export class SensorsService {
         airQuality: this.movingAvg(recentAir, raw.air_quality),
       },
       trend: {
-        temperature: this.detectTrend('temperature'),
-        humidity: this.detectTrend('humidity'),
-        lux: this.detectTrend('lux'),
-        airQuality: this.detectTrend('airQuality'),
+        temperature: this.detectTrend("temperature"),
+        humidity: this.detectTrend("humidity"),
+        lux: this.detectTrend("lux"),
+        airQuality: this.detectTrend("airQuality"),
       },
     };
   }
@@ -130,9 +130,7 @@ export class SensorsService {
     return +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
   }
 
-  private detectTrend(
-    field: string,
-  ): 'rising' | 'falling' | 'stable' | null {
+  private detectTrend(field: string): "rising" | "falling" | "stable" | null {
     const values = this.recentValues(field, TREND_WINDOW);
     if (values.length < 3) return null;
 
@@ -142,9 +140,9 @@ export class SensorsService {
     }
     const avg = diffs.reduce((a, b) => a + b, 0) / diffs.length;
 
-    if (avg > 0.3) return 'rising';
-    if (avg < -0.3) return 'falling';
-    return 'stable';
+    if (avg > 0.3) return "rising";
+    if (avg < -0.3) return "falling";
+    return "stable";
   }
 
   /* ───────── API pública ───────── */
@@ -161,11 +159,11 @@ export class SensorsService {
 
   getStats(): SensorStats {
     return {
-      temperature: this.metricStats('temperature'),
-      humidity: this.metricStats('humidity'),
-      lux: this.metricStats('lux'),
-      heatIndex: this.metricStats('heatIndex'),
-      airQuality: this.metricStats('airQuality'),
+      temperature: this.metricStats("temperature"),
+      humidity: this.metricStats("humidity"),
+      lux: this.metricStats("lux"),
+      heatIndex: this.metricStats("heatIndex"),
+      airQuality: this.metricStats("airQuality"),
       totalReadings: this.history.length,
       uptimeSeconds: Math.floor((Date.now() - this.startTime) / 1000),
     };

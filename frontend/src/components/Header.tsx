@@ -8,7 +8,7 @@ export default function Header({ deviceStatus, wsConnected }: Props) {
     <header className="header">
       <div>
         <h1 className="header__title">Sensor Hub</h1>
-        <p className="header__subtitle">ESP32 · BH1750 · DHT22</p>
+        <p className="header__subtitle">ESP32 · BH1750 · DHT22 · MQ-135</p>
       </div>
       <div className="header__indicators">
         <div className={`indicator ${deviceStatus === 'online' ? 'indicator--active' : ''}`}>

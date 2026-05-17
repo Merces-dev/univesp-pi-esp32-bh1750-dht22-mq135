@@ -13,10 +13,10 @@ export interface ProcessedTelemetry {
     airQuality: number | null;
   };
   trend: {
-    temperature: 'rising' | 'falling' | 'stable' | null;
-    humidity: 'rising' | 'falling' | 'stable' | null;
-    lux: 'rising' | 'falling' | 'stable' | null;
-    airQuality: 'rising' | 'falling' | 'stable' | null;
+    temperature: "rising" | "falling" | "stable" | null;
+    humidity: "rising" | "falling" | "stable" | null;
+    lux: "rising" | "falling" | "stable" | null;
+    airQuality: "rising" | "falling" | "stable" | null;
   };
 }
 
@@ -27,8 +27,8 @@ export interface TriggeredAlert {
   field: string;
   value: number;
   threshold: number;
-  condition: 'above' | 'below';
-  severity: 'info' | 'warning' | 'critical';
+  condition: "above" | "below";
+  severity: "info" | "warning" | "critical";
   message: string;
   timestamp: string;
   acknowledged: boolean;

@@ -1,6 +1,11 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import * as mqtt from 'mqtt';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import * as mqtt from "mqtt";
 
 @Injectable()
 export class MqttService implements OnModuleInit, OnModuleDestroy {
@@ -10,34 +15,34 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly eventEmitter: EventEmitter2) {}
 
   onModuleInit() {
-    const broker = process.env.MQTT_BROKER ?? 'localhost';
-    const port = process.env.MQTT_PORT ?? '1883';
+    const broker = process.env.MQTT_BROKER ?? "localhost";
+    const port = process.env.MQTT_PORT ?? "1883";
     const url = `mqtt://${broker}:${port}`;
 
     this.logger.log(`Connecting to MQTT broker at ${url}...`);
     this.client = mqtt.connect(url);
 
-    this.client.on('connect', () => {
-      this.logger.log('Connected to MQTT broker');
-      this.client.subscribe('esp32/sensors/telemetry');
-      this.client.subscribe('esp32/sensors/status');
+    this.client.on("connect", () => {
+      this.logger.log("Connected to MQTT broker");
+      this.client.subscribe("esp32/sensors/telemetry");
+      this.client.subscribe("esp32/sensors/status");
     });
 
-    this.client.on('message', (topic, payload) => {
+    this.client.on("message", (topic, payload) => {
       const raw = payload.toString();
-      if (topic === 'esp32/sensors/telemetry') {
+      if (topic === "esp32/sensors/telemetry") {
         try {
           const data = JSON.parse(raw);
-          this.eventEmitter.emit('telemetry.raw', data);
+          this.eventEmitter.emit("telemetry.raw", data);
         } catch {
           this.logger.warn(`Invalid JSON on telemetry topic: ${raw}`);
         }
-      } else if (topic === 'esp32/sensors/status') {
-        this.eventEmitter.emit('device.status', raw);
+      } else if (topic === "esp32/sensors/status") {
+        this.eventEmitter.emit("device.status", raw);
       }
     });
 
-    this.client.on('error', (err) => {
+    this.client.on("error", (err) => {
       this.logger.error(`MQTT error: ${err.message}`);
     });
   }

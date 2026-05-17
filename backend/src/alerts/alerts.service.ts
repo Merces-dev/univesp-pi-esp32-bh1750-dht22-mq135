@@ -1,110 +1,110 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { AlertRule, TriggeredAlert } from './interfaces/alert.interface';
-import { ProcessedTelemetry } from '../sensors/interfaces/telemetry.interface';
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { AlertRule, TriggeredAlert } from "./interfaces/alert.interface";
+import { ProcessedTelemetry } from "../sensors/interfaces/telemetry.interface";
 
 const ALERT_COOLDOWN_MS = 30_000;
 
 const DEFAULT_RULES: AlertRule[] = [
   {
-    id: 'temp-critical-high',
-    name: 'Temperatura Crítica',
-    field: 'temperature',
-    condition: 'above',
+    id: "temp-critical-high",
+    name: "Temperatura Crítica",
+    field: "temperature",
+    condition: "above",
     threshold: 35,
-    severity: 'critical',
-    message: 'Temperatura ultrapassou 35°C — risco de superaquecimento',
+    severity: "critical",
+    message: "Temperatura ultrapassou 35°C — risco de superaquecimento",
     enabled: true,
   },
   {
-    id: 'temp-warning-high',
-    name: 'Temperatura Elevada',
-    field: 'temperature',
-    condition: 'above',
+    id: "temp-warning-high",
+    name: "Temperatura Elevada",
+    field: "temperature",
+    condition: "above",
     threshold: 30,
-    severity: 'warning',
-    message: 'Temperatura acima de 30°C',
+    severity: "warning",
+    message: "Temperatura acima de 30°C",
     enabled: true,
   },
   {
-    id: 'temp-warning-low',
-    name: 'Temperatura Baixa',
-    field: 'temperature',
-    condition: 'below',
+    id: "temp-warning-low",
+    name: "Temperatura Baixa",
+    field: "temperature",
+    condition: "below",
     threshold: 10,
-    severity: 'warning',
-    message: 'Temperatura abaixo de 10°C',
+    severity: "warning",
+    message: "Temperatura abaixo de 10°C",
     enabled: true,
   },
   {
-    id: 'humidity-high',
-    name: 'Umidade Elevada',
-    field: 'humidity',
-    condition: 'above',
+    id: "humidity-high",
+    name: "Umidade Elevada",
+    field: "humidity",
+    condition: "above",
     threshold: 80,
-    severity: 'warning',
-    message: 'Umidade relativa acima de 80%',
+    severity: "warning",
+    message: "Umidade relativa acima de 80%",
     enabled: true,
   },
   {
-    id: 'humidity-low',
-    name: 'Umidade Baixa',
-    field: 'humidity',
-    condition: 'below',
+    id: "humidity-low",
+    name: "Umidade Baixa",
+    field: "humidity",
+    condition: "below",
     threshold: 30,
-    severity: 'warning',
-    message: 'Umidade relativa abaixo de 30%',
+    severity: "warning",
+    message: "Umidade relativa abaixo de 30%",
     enabled: true,
   },
   {
-    id: 'lux-high',
-    name: 'Luminosidade Alta',
-    field: 'lux',
-    condition: 'above',
+    id: "lux-high",
+    name: "Luminosidade Alta",
+    field: "lux",
+    condition: "above",
     threshold: 10000,
-    severity: 'warning',
-    message: 'Luminosidade acima de 10.000 lux — exposição solar direta',
+    severity: "warning",
+    message: "Luminosidade acima de 10.000 lux — exposição solar direta",
     enabled: true,
   },
   {
-    id: 'lux-low',
-    name: 'Ambiente Escuro',
-    field: 'lux',
-    condition: 'below',
+    id: "lux-low",
+    name: "Ambiente Escuro",
+    field: "lux",
+    condition: "below",
     threshold: 10,
-    severity: 'info',
-    message: 'Luminosidade abaixo de 10 lux — ambiente escuro',
+    severity: "info",
+    message: "Luminosidade abaixo de 10 lux — ambiente escuro",
     enabled: true,
   },
   {
-    id: 'heat-index-critical',
-    name: 'Índice de Calor Perigoso',
-    field: 'heatIndex',
-    condition: 'above',
+    id: "heat-index-critical",
+    name: "Índice de Calor Perigoso",
+    field: "heatIndex",
+    condition: "above",
     threshold: 40,
-    severity: 'critical',
-    message: 'Índice de calor ultrapassou 40°C — condições perigosas',
+    severity: "critical",
+    message: "Índice de calor ultrapassou 40°C — condições perigosas",
     enabled: true,
   },
   {
-    id: 'air-quality-warning',
-    name: 'Qualidade do Ar Moderada',
-    field: 'airQuality',
-    condition: 'above',
+    id: "air-quality-warning",
+    name: "Qualidade do Ar Moderada",
+    field: "airQuality",
+    condition: "above",
     threshold: 300,
-    severity: 'warning',
-    message: 'Qualidade do ar acima de 300 ppm — ventilação recomendada',
+    severity: "warning",
+    message: "Qualidade do ar acima de 300 ppm — ventilação recomendada",
     enabled: true,
   },
   {
-    id: 'air-quality-critical',
-    name: 'Qualidade do Ar Ruim',
-    field: 'airQuality',
-    condition: 'above',
+    id: "air-quality-critical",
+    name: "Qualidade do Ar Ruim",
+    field: "airQuality",
+    condition: "above",
     threshold: 600,
-    severity: 'critical',
-    message: 'Qualidade do ar acima de 600 ppm — nível perigoso',
+    severity: "critical",
+    message: "Qualidade do ar acima de 600 ppm — nível perigoso",
     enabled: true,
   },
 ];
@@ -118,7 +118,7 @@ export class AlertsService {
 
   constructor(private readonly eventEmitter: EventEmitter2) {}
 
-  @OnEvent('telemetry.processed')
+  @OnEvent("telemetry.processed")
   checkAlerts(data: ProcessedTelemetry): void {
     const now = Date.now();
 
@@ -129,7 +129,7 @@ export class AlertsService {
       if (value === null || value === undefined) continue;
 
       const triggered =
-        rule.condition === 'above'
+        rule.condition === "above"
           ? value > rule.threshold
           : value < rule.threshold;
 
@@ -158,7 +158,7 @@ export class AlertsService {
       }
 
       this.lastTriggered.set(rule.id, now);
-      this.eventEmitter.emit('alert.triggered', alert);
+      this.eventEmitter.emit("alert.triggered", alert);
       this.logger.warn(
         `[${rule.severity.toUpperCase()}] ${rule.message} (${rule.field}=${value})`,
       );

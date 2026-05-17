@@ -1,5 +1,5 @@
-export type AlertSeverity = 'info' | 'warning' | 'critical';
-export type AlertCondition = 'above' | 'below';
+export type AlertSeverity = "info" | "warning" | "critical";
+export type AlertCondition = "above" | "below";
 
 export interface AlertRule {
   id: string;

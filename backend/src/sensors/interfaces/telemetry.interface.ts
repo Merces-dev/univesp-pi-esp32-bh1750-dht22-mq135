@@ -22,10 +22,10 @@ export interface ProcessedTelemetry {
     airQuality: number | null;
   };
   trend: {
-    temperature: 'rising' | 'falling' | 'stable' | null;
-    humidity: 'rising' | 'falling' | 'stable' | null;
-    lux: 'rising' | 'falling' | 'stable' | null;
-    airQuality: 'rising' | 'falling' | 'stable' | null;
+    temperature: "rising" | "falling" | "stable" | null;
+    humidity: "rising" | "falling" | "stable" | null;
+    lux: "rising" | "falling" | "stable" | null;
+    airQuality: "rising" | "falling" | "stable" | null;
   };
 }
 
@@ -35,7 +35,7 @@ export interface MetricStats {
   max: number;
   avg: number;
   movingAvg: number | null;
-  trend: 'rising' | 'falling' | 'stable' | null;
+  trend: "rising" | "falling" | "stable" | null;
 }
 
 export interface SensorStats {
